@@ -9,6 +9,7 @@
       <div id="result-frame">
         <video ref="video" autoplay></video>
         <canvas ref="canvas" :width="resultWidth" :height="resultHeight"></canvas>
+<<<<<<< HEAD
        </div>
       </div>
        <ul>
@@ -16,13 +17,31 @@
            {{prediction.name}}, {{prediction.score}} %
            </li>
            </ul>
+=======
+      </div>
+      <div> 
+       <div v-for="prediction, index in predictions" v-bind:key="index"> 
+         {{prediction.class}}
+       </div>
+       <ul>
+  <li v-for="(prediction, index) in predictions" v-bind:key="index">
+    {{prediction.name}}, {{prediction.score}} %
+  </li>
+</ul>
+      </div>
+    </div>
+>>>>>>> 2a64c057957fea71a135207d1c3190ba152a7901
   </div>
 </template>
 
 <script>
 import * as tf from '@tensorflow/tfjs'
+<<<<<<< HEAD
 import * as tmImage from '@teachablemachine/image'
 
+=======
+import * as cocoSsd from '@tensorflow-models/coco-ssd'
+>>>>>>> 2a64c057957fea71a135207d1c3190ba152a7901
 
 export default {
   name: 'App',
@@ -36,9 +55,13 @@ export default {
         devices: [],
         baseModel: 'mobilenet_v2',
         isModelReady: false,
+<<<<<<< HEAD
         predictions: [],
         synth: window.speechSynthesis,
         lastPrediction: ''
+=======
+        predictions: []
+>>>>>>> 2a64c057957fea71a135207d1c3190ba152a7901
     }
   },
 
@@ -113,11 +136,19 @@ setResultSize () {
 },
 
 loadModel () {
+<<<<<<< HEAD
     return tmImage.load('/model.json', '/metadata.json')
     .then(model => {
         this.model = model
         this.isModelReady = true
         //console.log('model loaded')
+=======
+    return cocoSsd.load(this.baseModel)
+    .then(model => {
+        this.model = model
+        this.isModelReady = true
+        console.log('model loaded')
+>>>>>>> 2a64c057957fea71a135207d1c3190ba152a7901
     })
     .catch((error) => {
         console.log('failed to load the model', error)
@@ -129,9 +160,15 @@ detectObjects () {
     if (!this.isModelReady) return
 
     if (this.isVideoStreamReady) {
+<<<<<<< HEAD
     this.model.predict(this.$refs.video)
         .then(predictions => {
             this.handlePredictions(predictions)
+=======
+    this.model.detect(this.$refs.video)
+        .then(predictions => {
+            this.renderPredictions(predictions)
+>>>>>>> 2a64c057957fea71a135207d1c3190ba152a7901
             requestAnimationFrame(() => {
             this.detectObjects()
             })
@@ -143,6 +180,7 @@ detectObjects () {
     }
 },
 
+<<<<<<< HEAD
 
 //handlePredictions(prediction){
 //splice
@@ -208,6 +246,37 @@ speak (prediction) {
     const utterThis = new SpeechSynthesisUtterance(prediction);
     this.synth.speak(utterThis)
 }
+=======
+renderPredictions (predictions) {
+    const ctx = this.$refs.canvas.getContext('2d')
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height)
+    predictions.forEach(prediction => {
+        ctx.beginPath()
+        ctx.rect(...prediction.bbox)
+        ctx.lineWidth = 3
+        ctx.strokeStyle = 'red'
+        ctx.fillStyle = 'red'
+        ctx.stroke()
+        ctx.shadowColor = 'white'
+        ctx.shadowBlur = 10
+        ctx.font = '24px Arial bold'
+        ctx.fillText(
+            `${(prediction.score * 100).toFixed(1)}% ${prediction.class}`,
+            prediction.bbox[0],
+            prediction.bbox[1] > 10 ? prediction.bbox[1] - 5 : 10
+        )
+    })
+       this.predictions.splice(0)
+       predictions.forEach(prediction => {
+          this.predictions.push({
+      name: prediction.class,
+      score: (prediction.score*100).toFixed(1)
+    })
+  })
+
+       
+  }
+>>>>>>> 2a64c057957fea71a135207d1c3190ba152a7901
  }
 }
 
