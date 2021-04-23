@@ -1,313 +1,182 @@
 <template>
-  <div id="app">
-    <div id="center-container">
-      <select id="camera-select" v-model="videoDevice" @change="initWebcamStream()">
-        <option v-for="device in devices" v-bind:key="device.deviceId" v-bind:value="device.deviceId">
+  <div class="app">
+    <div class="center-container">
+      <select class="margin-10 device-select" v-model="audioDevice">
+        <option v-for="device, id in audioDevices" :key="id" :value="device.deviceId">
           {{ device.label }}
         </option>
       </select>
-      <div id="result-frame">
-        <video ref="video" autoplay></video>
-        <canvas ref="canvas" :width="resultWidth" :height="resultHeight"></canvas>
-<<<<<<< HEAD
-       </div>
-      </div>
-       <ul>
-         <li v-for="(prediction, index) in predictions" v-bind:key="index">
-           {{prediction.name}}, {{prediction.score}} %
-           </li>
-           </ul>
-=======
-      </div>
-      <div> 
-       <div v-for="prediction, index in predictions" v-bind:key="index"> 
-         {{prediction.class}}
-       </div>
-       <ul>
-  <li v-for="(prediction, index) in predictions" v-bind:key="index">
-    {{prediction.name}}, {{prediction.score}} %
-  </li>
-</ul>
-      </div>
+      <table class="margin-10">
+        <tr class="top-row" v-if="topPrediction != null">
+          <td>{{ topPrediction.name }}</td>
+          <td>{{ topPrediction.score }} %</td>
+        </tr>
+        <tr v-else>
+          <td>Not sure...</td>
+        </tr>
+        <tr class="other-rows" v-for="(prediction, index) in filteredSortedPredictions" v-bind:key="index">
+          <td>{{prediction.name}}</td>
+          <td>{{prediction.score}} %</td>
+        </tr>
+      </table>
     </div>
->>>>>>> 2a64c057957fea71a135207d1c3190ba152a7901
   </div>
 </template>
 
 <script>
 import * as tf from '@tensorflow/tfjs'
-<<<<<<< HEAD
-import * as tmImage from '@teachablemachine/image'
-
-=======
-import * as cocoSsd from '@tensorflow-models/coco-ssd'
->>>>>>> 2a64c057957fea71a135207d1c3190ba152a7901
-
+import * as speechCommands from '@tensorflow-models/speech-commands'
 export default {
   name: 'App',
   components: {
   },
   data () {
     return {
-        videoDevice: '',
-        resultWidth: 0,
-        resultHeight: 0,
-        devices: [],
-        baseModel: 'mobilenet_v2',
-        isModelReady: false,
-<<<<<<< HEAD
-        predictions: [],
-        synth: window.speechSynthesis,
-        lastPrediction: ''
-=======
-        predictions: []
->>>>>>> 2a64c057957fea71a135207d1c3190ba152a7901
+      isModelReady: false,
+      predictions: [],
+      audioTrackConstraints: {},
+      audioDevices: [],
+      audioDevice: ''
     }
   },
-
-  mounted () {
+  watch: {
+    audioDevice: function (deviceId) {
+      if (this.recognizer) {
+        this.setupRecognizer(deviceId)
+      }
+    }
+  },
+  computed: {
+    sortedPredictions () {
+      const predictions = [...this.predictions]
+      predictions.sort((a, b) => {
+        return (b.score - a.score)
+      })
+      return predictions
+    },
+    topPrediction () {
+      if (this.sortedPredictions.length > 0) {
+        return this.sortedPredictions[0]
+      }
+      else {
+        return null
+      }
+    },
+    filteredSortedPredictions () {
+      const t = this.topPrediction
+      return this.sortedPredictions.filter(p => p != t)
+    }
+  },
+  async mounted () {
     tf.setBackend('webgl')
-
-    this.listVideoDevices()
-    .then(videoDevices => {
-        for (let device of videoDevices) {
-            this.devices.push(device)
+    const enumeratorPromise = navigator.mediaDevices.enumerateDevices()
+    enumeratorPromise.then(async devices => {
+      devices.forEach(device => {
+        if (device.kind === 'audioinput') {
+          this.audioDevices.push(device)
         }
-        this.videoDevice = videoDevices[0].deviceId
-    })
-    .then(() => {
-        return this.initWebcamStream()
-    })
-    .then(() => {
-      return this.loadModel()
-    })
-    .then(() => {
-    this.detectObjects()
-  })
-},
-
-  methods: {
-    listVideoDevices () {
-    return navigator.mediaDevices.enumerateDevices()
-    .then(devices => {
-        return devices.filter(device => device.kind === 'videoinput')
+      })
+      this.audioDevice = this.audioDevices[0].deviceId
+      this.recognizer = await this.createModel()
+      this.classLabels = this.recognizer.wordLabels() // get class labels
+      
+      this.setupRecognizer(this.audioDevice)
     })
   },
-  initWebcamStream () {
-    this.isVideoStreamReady = false
-    // if the browser supports mediaDevices.getUserMedia API
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-    return navigator.mediaDevices.getUserMedia({
-        video: { deviceId: this.videoDevice }
-    })
-    .then(stream => {
-        // set <video> source as the webcam input
-        let video = this.$refs.video
-        video.srcObject = stream
-
-        return new Promise((resolve) => {
-        // when video is loaded
-        video.onloadedmetadata = () => {
-            // calculate the video ratio
-            this.videoRatio = video.videoHeight / video.videoWidth
-            // add event listener on resize to reset the <video> and <canvas> sizes
-            window.addEventListener('resize', this.setResultSize)
-            // set the initial size
-            this.setResultSize()
-            this.isVideoStreamReady = true
-            resolve()
-        }
-        })
-    })
-    // error handling
-    .catch(error => {
-        console.log('failed to initialize webcam stream', error)
-    })
-    }
-},
-
-setResultSize () {
-    let clientWidth = document.documentElement.clientWidth
-    this.resultWidth = Math.min(600, clientWidth)
-    this.resultHeight = this.resultWidth * this.videoRatio
-    let video = this.$refs.video
-    video.width = this.resultWidth
-    video.height = this.resultHeight
-},
-
-loadModel () {
-<<<<<<< HEAD
-    return tmImage.load('/model.json', '/metadata.json')
-    .then(model => {
-        this.model = model
-        this.isModelReady = true
-        //console.log('model loaded')
-=======
-    return cocoSsd.load(this.baseModel)
-    .then(model => {
-        this.model = model
-        this.isModelReady = true
-        console.log('model loaded')
->>>>>>> 2a64c057957fea71a135207d1c3190ba152a7901
-    })
-    .catch((error) => {
-        console.log('failed to load the model', error)
-        throw (error)
-    })
-},
-
-detectObjects () {
-    if (!this.isModelReady) return
-
-    if (this.isVideoStreamReady) {
-<<<<<<< HEAD
-    this.model.predict(this.$refs.video)
-        .then(predictions => {
-            this.handlePredictions(predictions)
-=======
-    this.model.detect(this.$refs.video)
-        .then(predictions => {
-            this.renderPredictions(predictions)
->>>>>>> 2a64c057957fea71a135207d1c3190ba152a7901
-            requestAnimationFrame(() => {
-            this.detectObjects()
+  methods: {
+    async setupRecognizer (deviceId) {
+      if (this.recognizer.isListening()) {
+        await this.recognizer.stopListening()
+      }
+      // listen() takes two arguments:
+      // 1. A callback function that is invoked anytime a word is recognized.
+      // 2. A configuration object with adjustable fields
+      await this.recognizer.listen(result => {
+        this.handlePredictions(result.scores)
+      }, {
+          includeSpectrogram: false, // in case listen should return result.spectrogram
+          probabilityThreshold: 0.75,
+          invokeCallbackOnNoiseAndUnknown: true,
+          overlapFactor: 0.5, // probably want between 0.5 and 0.75. More info in README
+          audioTrackConstraints: {
+            deviceId: deviceId
+          }
+      })
+    },
+    async createModel() {
+        const recognizer = speechCommands.create('BROWSER_FFT', '18w')
+        // (1) try replacing the '18w' function argument with 'directional4w'.
+        // - What happens? Why?
+        // - check https://github.com/tensorflow/tfjs-models/tree/master/speech-commands
+        // (2) replace the model trained on Speech Commands with a model trained on your own data
+        /*
+        const checkpointURL = `${location.protocol}//${location.host}/model.json` // model topology
+        const metadataURL = `${location.protocol}//${location.host}/metadata.json` // model metadata
+        const recognizer = speechCommands.create(
+            'BROWSER_FFT', // fourier transform type, not useful to change
+            undefined, // speech commands vocabulary feature, not useful for your models
+            checkpointURL,
+            metadataURL)
+        */
+        // check that model and metadata are loaded via HTTPS requests.
+        await recognizer.ensureModelLoaded()
+        return recognizer
+    },
+    handlePredictions (predictions) {
+        this.predictions.length = 0
+        
+        predictions.forEach((prediction, index) => {
+            this.predictions.push({
+              name: this.classLabels[index],
+              score: (prediction * 100).toFixed(1)
             })
         })
-    } else {
-    requestAnimationFrame(() => {
-        this.detectObjects()
-    })
     }
-},
-
-<<<<<<< HEAD
-
-//handlePredictions(prediction){
-//splice
-//predictions.forEach(prediction
-//}
-//speak function
-// renderPredictions (predictions) {
-//     const ctx = this.$refs.canvas.getContext('2d')
-//     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height)
-//     predictions.forEach(prediction => {
-//         ctx.beginPath()
-//         ctx.rect(...prediction.bbox)
-//         ctx.lineWidth = 3
-//         ctx.strokeStyle = 'red'
-//         ctx.fillStyle = 'red'
-//         ctx.stroke()
-//         ctx.shadowColor = 'white'
-//         ctx.shadowBlur = 10
-//         ctx.font = '24px Arial bold'
-//         ctx.fillText(
-//             `${(prediction.score * 100).toFixed(1)}% ${prediction.class}`,
-//             prediction.bbox[0],
-//             prediction.bbox[1] > 10 ? prediction.bbox[1] - 5 : 10
-//         )
-//     })
-//        this.predictions.splice(0)
-//        predictions.forEach(prediction => {
-//           this.predictions.push({
-//       name: prediction.class,
-//       score: (prediction.score*100).toFixed(1)
-//     })
-//   })
-
-       
-//   },
-
-handlePredictions (predictions) {
-    this.predictions.splice(0)
-    
-    let maxPrediction
-    let maxProb = 0
-
-    predictions.forEach(prediction => {
-        this.predictions.push({
-            name: prediction.className,
-            score: (prediction.probability * 100).toFixed(1)
-        })
-
-        if (prediction.probability > maxProb) {
-            maxProb = prediction.probability
-            maxPrediction = prediction
-        }
-    })
-
-    if (! this.synth.speaking && this.lastPrediction != maxPrediction.className) {
-        const utterThis = new SpeechSynthesisUtterance(maxPrediction.className);
-        this.speak(maxPrediction.className)
-        this.lastPrediction = maxPrediction.className
-    }
-},
-
-speak (prediction) {
-    const utterThis = new SpeechSynthesisUtterance(prediction);
-    this.synth.speak(utterThis)
-}
-=======
-renderPredictions (predictions) {
-    const ctx = this.$refs.canvas.getContext('2d')
-    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height)
-    predictions.forEach(prediction => {
-        ctx.beginPath()
-        ctx.rect(...prediction.bbox)
-        ctx.lineWidth = 3
-        ctx.strokeStyle = 'red'
-        ctx.fillStyle = 'red'
-        ctx.stroke()
-        ctx.shadowColor = 'white'
-        ctx.shadowBlur = 10
-        ctx.font = '24px Arial bold'
-        ctx.fillText(
-            `${(prediction.score * 100).toFixed(1)}% ${prediction.class}`,
-            prediction.bbox[0],
-            prediction.bbox[1] > 10 ? prediction.bbox[1] - 5 : 10
-        )
-    })
-       this.predictions.splice(0)
-       predictions.forEach(prediction => {
-          this.predictions.push({
-      name: prediction.class,
-      score: (prediction.score*100).toFixed(1)
-    })
-  })
-
-       
   }
->>>>>>> 2a64c057957fea71a135207d1c3190ba152a7901
- }
 }
-
-
 </script>
 
-
 <style>
-
-#app {
+.app {
   font-family: Avenir, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   color: #2c3e50;
   margin-top: 60px;
 }
-video {
-  position: absolute;
+table {
+  width: 100%;
+  border-spacing: 5px;
 }
-canvas {
-  position: absolute;
+.margin-10 {
+  margin: 10px;
 }
-#center-container {
+.top-row {
+  background-color: rgba(0, 200, 0, 0.1);
+  height: 40px;
+  font-weight: 900;
+}
+.other-rows {
+  background-color: rgba(200, 0, 0, 0.1);
+  height: 30px;
+  font-weight: 400;
+}
+td {
+  padding: 5px;
+}
+td:nth-child(1) {
+  width: 70%;
+    text-align: left;
+}
+td:nth-child(2) {
+  width: 30%;
+  text-align: center;
+}
+.center-container {
   width: 600px;
   margin: 0 auto;
 }
-#camera-select {
-  width: 300px;
-  margin-bottom: 50px;
-}
-#result-frame {
-  height: 600px;
+.device-select {
+  width: 100%;
 }
 </style>
