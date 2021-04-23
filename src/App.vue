@@ -6,6 +6,7 @@
           {{ device.label }}
         </option>
       </select>
+      <input v-model="username">
       <div id="result-frame">
         <video ref="video" autoplay></video>
         <canvas ref="canvas" :width="resultWidth" :height="resultHeight"></canvas>
@@ -35,7 +36,8 @@ export default {
       baseModel: 'mobilenet_v2',
       isModelReady: false,
       predictions: [],
-      lastPrediction: ''
+      lastPrediction: '',
+      username: ''
     }
   },
   mounted () {
@@ -57,7 +59,7 @@ export default {
         this.detectObjects()
       })
     })
-    this.webSocket = new WebSocket('ws://localhost:8081')
+    this.webSocket = new WebSocket('wss://a91cdfc1ad7d.ngrok.io/')
   },
   methods: {
     listVideoDevices () {
@@ -151,6 +153,7 @@ export default {
         })
         if (this.lastPrediction != maxPrediction.className) {
           const message = {
+            username: this.username,
             type: 'image',
             className: maxPrediction.className,
             score: maxPrediction.probability
