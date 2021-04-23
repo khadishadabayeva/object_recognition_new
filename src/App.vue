@@ -1,191 +1,191 @@
 <template>
-  <div class="app">
-    <div class="center-container">
-      <select class="margin-10 device-select" v-model="audioDevice">
-        <option v-for="device, id in audioDevices" :key="id" :value="device.deviceId">
+  <div id="app">
+    <div id="center-container">
+      <select id="camera-select" v-model="videoDevice" @change="initWebcamStream()">
+        <option v-for="device in devices" v-bind:key="device.deviceId" v-bind:value="device.deviceId">
           {{ device.label }}
         </option>
       </select>
-      <table class="margin-10">
-        <tr class="top-row" v-if="topPrediction != null">
-          <td>{{ topPrediction.name }}</td>
-          <td>{{ topPrediction.score }} %</td>
-        </tr>
-        <tr v-else>
-          <td>Not sure...</td>
-        </tr>
-        <tr class="other-rows" v-for="(prediction, index) in filteredSortedPredictions" v-bind:key="index">
-          <td>{{prediction.name}}</td>
-          <td>{{prediction.score}} %</td>
-        </tr>
-      </table>
+      <div id="result-frame">
+        <video ref="video" autoplay></video>
+        <canvas ref="canvas" :width="resultWidth" :height="resultHeight"></canvas>
+      </div>
+      <ul>
+        <li v-for="(prediction, index) in predictions" v-bind:key="index">
+          {{prediction.name}}, {{prediction.score}} %
+        </li>
+      </ul>
     </div>
   </div>
 </template>
 
 <script>
 import * as tf from '@tensorflow/tfjs'
-import * as speechCommands from '@tensorflow-models/speech-commands'
+import * as tmImage from '@teachablemachine/image'
 export default {
   name: 'App',
   components: {
   },
   data () {
     return {
+      videoDevice: '',
+      resultWidth: 0,
+      resultHeight: 0,
+      devices: [],
+      baseModel: 'mobilenet_v2',
       isModelReady: false,
       predictions: [],
-      audioTrackConstraints: {},
-      audioDevices: [],
-      audioDevice: ''
+      lastPrediction: ''
     }
   },
-  watch: {
-    audioDevice: function (deviceId) {
-      if (this.recognizer) {
-        this.setupRecognizer(deviceId)
-      }
-    }
-  },
-  computed: {
-    sortedPredictions () {
-      const predictions = [...this.predictions]
-      predictions.sort((a, b) => {
-        return (b.score - a.score)
-      })
-      return predictions
-    },
-    topPrediction () {
-      if (this.sortedPredictions.length > 0) {
-        return this.sortedPredictions[0]
-      }
-      else {
-        return null
-      }
-    },
-    filteredSortedPredictions () {
-      const t = this.topPrediction
-      return this.sortedPredictions.filter(p => p != t)
-    }
-  },
-  async mounted () {
+  mounted () {
     tf.setBackend('webgl')
-    const enumeratorPromise = navigator.mediaDevices.enumerateDevices()
-    enumeratorPromise.then(async devices => {
-      devices.forEach(device => {
-        if (device.kind === 'audioinput') {
-          this.audioDevices.push(device)
-        }
-      })
-      this.audioDevice = this.audioDevices[0].deviceId
-      this.recognizer = await this.createModel()
-      this.classLabels = this.recognizer.wordLabels() // get class labels
-      
-      this.setupRecognizer(this.audioDevice)
+    
+    this.listVideoDevices()
+    .then(videoDevices => {
+      for (let device of videoDevices) {
+        this.devices.push(device)
+      }
+      this.videoDevice = videoDevices[0].deviceId
     })
-
+    .then(() => {
+      return this.initWebcamStream()
+    })
+    .then(() => {
+      return this.loadModel()
+      .then(() => {
+        this.detectObjects()
+      })
+    })
     this.webSocket = new WebSocket('ws://localhost:8081')
   },
   methods: {
-    async setupRecognizer (deviceId) {
-      if (this.recognizer.isListening()) {
-        await this.recognizer.stopListening()
-      }
-      // listen() takes two arguments:
-      // 1. A callback function that is invoked anytime a word is recognized.
-      // 2. A configuration object with adjustable fields
-      await this.recognizer.listen(result => {
-        this.handlePredictions(result.scores)
-      }, {
-          includeSpectrogram: false, // in case listen should return result.spectrogram
-          probabilityThreshold: 0.75,
-          invokeCallbackOnNoiseAndUnknown: true,
-          overlapFactor: 0.5, // probably want between 0.5 and 0.75. More info in README
-          audioTrackConstraints: {
-            deviceId: deviceId
-          }
+    listVideoDevices () {
+      return navigator.mediaDevices.enumerateDevices()
+        .then(devices => {
+          return devices.filter(device => device.kind === 'videoinput')
       })
     },
-    async createModel() {
-       // const recognizer = speechCommands.create('BROWSER_FFT', 'directional4w')
-        // (1) try replacing the '18w' function argument with 'directional4w'.
-        // - What happens? Why?
-        // - check https://github.com/tensorflow/tfjs-models/tree/master/speech-commands
-        // (2) replace the model trained on Speech Commands with a model trained on your own data
-        
-        const checkpointURL = `${location.protocol}//${location.host}/model.json` // model topology
-        const metadataURL = `${location.protocol}//${location.host}/metadata.json` // model metadata
-        const recognizer = speechCommands.create(
-            'BROWSER_FFT', // fourier transform type, not useful to change
-            undefined, // speech commands vocabulary feature, not useful for your models
-            checkpointURL,
-            metadataURL)
-      
-        // check that model and metadata are loaded via HTTPS requests.
-        await recognizer.ensureModelLoaded()
-        return recognizer
+    initWebcamStream () {
+      this.isVideoStreamReady = false
+      // if the browser supports mediaDevices.getUserMedia API
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        return navigator.mediaDevices.getUserMedia({
+          video: { deviceId: this.videoDevice }
+        })
+        .then(stream => {
+          // set <video> source as the webcam input
+          let video = this.$refs.video
+          video.srcObject = stream
+          return new Promise((resolve) => {
+            // when video is loaded
+            video.onloadedmetadata = () => {
+              // calculate the video ratio
+              this.videoRatio = video.videoHeight / video.videoWidth
+              // add event listener on resize to reset the <video> and <canvas> sizes
+              window.addEventListener('resize', this.setResultSize)
+              // set the initial size
+              this.setResultSize()
+              this.isVideoStreamReady = true
+              resolve()
+            }
+          })
+        })
+        // error handling
+        .catch(error => {
+          console.log('failed to initialize webcam stream', error)
+        })
+      }
+    },
+    
+    setResultSize () {
+      let clientWidth = document.documentElement.clientWidth
+      this.resultWidth = Math.min(600, clientWidth)
+      this.resultHeight = this.resultWidth * this.videoRatio
+      let video = this.$refs.video
+      video.width = this.resultWidth
+      video.height = this.resultHeight
+    },
+    loadModel () {
+      return tmImage.load('/model.json', '/metadata.json')
+      .then(model => {
+        this.model = model
+        this.isModelReady = true
+      })
+      .catch(error => {
+        console.log('failed to load the mode', error)
+        throw(error)
+      })
+    },
+    detectObjects () {
+        if (!this.isModelReady) return
+        if (this.isVideoStreamReady) {
+          this.model.predict(this.$refs.video)
+          .then(predictions => {
+            this.handlePredictions(predictions)
+            
+            requestAnimationFrame(() => {
+              this.detectObjects()
+            })
+          })
+        } else {
+          requestAnimationFrame(() => {
+            this.detectObjects()
+          })
+        }
     },
     handlePredictions (predictions) {
-        this.predictions.length = 0
+        this.predictions.splice(0)
         
-        predictions.forEach((prediction, index) => {
+        let maxPrediction
+        let maxProb = 0
+        predictions.forEach(prediction => {
             this.predictions.push({
-              name: this.classLabels[index],
-              score: (prediction * 100).toFixed(1)
+              name: prediction.className,
+              score: (prediction.probability * 100).toFixed(1)
             })
+            if (prediction.probability > maxProb) {
+              maxProb = prediction.probability
+              maxPrediction = prediction
+            }
         })
-
-        const message = {
-          className: this.topPrediction.name,
-          score: this.topPrediction.score
+        if (this.lastPrediction != maxPrediction.className) {
+          const message = {
+            type: 'image',
+            className: maxPrediction.className,
+            score: maxPrediction.probability
+          }
+          this.webSocket.send(JSON.stringify(message))
+          this.lastPrediction = maxPrediction.className
         }
-
-        this.webSocket.send(JSON.stringify(message))
     }
   }
 }
 </script>
 
 <style>
-.app {
+#app {
   font-family: Avenir, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   color: #2c3e50;
   margin-top: 60px;
 }
-table {
-  width: 100%;
-  border-spacing: 5px;
+#result-frame {
+  height: 500px;
 }
-.margin-10 {
-  margin: 10px;
+video {
+  position: absolute;
 }
-.top-row {
-  background-color: rgba(0, 200, 0, 0.1);
-  height: 40px;
-  font-weight: 900;
+canvas {
+  position: absolute;
 }
-.other-rows {
-  background-color: rgba(200, 0, 0, 0.1);
-  height: 30px;
-  font-weight: 400;
-}
-td {
-  padding: 5px;
-}
-td:nth-child(1) {
-  width: 70%;
-    text-align: left;
-}
-td:nth-child(2) {
-  width: 30%;
-  text-align: center;
-}
-.center-container {
+#center-container {
   width: 600px;
   margin: 0 auto;
 }
-.device-select {
-  width: 100%;
+#camera-select {
+  width: 300px;
+  margin-bottom: 50px;
 }
 </style>
