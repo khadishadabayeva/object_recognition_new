@@ -83,7 +83,7 @@ export default {
       this.setupRecognizer(this.audioDevice)
     })
 
-    this.webSocket = new WebSocket('ws://localhost:8081')
+    this.webSocket = new WebSocket('wss://a91cdfc1ad7d.ngrok.io/')
   },
   methods: {
     async setupRecognizer (deviceId) {
@@ -135,6 +135,8 @@ export default {
         })
 
         const message = {
+          username:'Khadisha',
+          detectiontype: 'speech',
           className: this.topPrediction.name,
           score: this.topPrediction.score
         }
