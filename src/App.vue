@@ -1,3 +1,4 @@
+// new architecture
 <template>
   <div class="app">
     <div class="center-container">
