@@ -38,8 +38,23 @@ export default {
       audioTrackConstraints: {},
       audioDevices: [],
       audioDevice: ''
+      // messages: [],
+      // socketId: ''
     }
   },
+  
+//   sockets: {
+//     connect() {
+//         this.socketId = this.$socket.id
+//     },
+//     serverMessage (arg) {
+//         this.messages.push(arg)
+//     },
+//     serverMessages (arg) {
+//         this.messages = arg
+//     }
+// },
+
   watch: {
     audioDevice: function (deviceId) {
       if (this.recognizer) {

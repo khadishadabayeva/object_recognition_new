@@ -1,16 +1,46 @@
 <template>
   <div id="app">
-  <router-view/>
+    <nav>
+    <router-link to="/screen1">Screen 1</router-link> |
+    <router-link to="/screen2">Screen 2</router-link> |
+    <router-link to="/screen3">Screen 3</router-link>
+</nav>
+  <!-- <router-view/> -->
   </div>
+ <h2>I am {{ socketId }}</h2>
+  <h2>Messages</h2>
+  <div v-for="message, id in messages" :key="id">
+    {{message}</div>
+
 </template>
 
 <script>
+
 export default {
   name: 'App',
   components: {
-  }
+  },
+  data () {
+    return {
+        messages: [],
+        socketId: ''
+    }
+},
+
+sockets: {
+    connect() {
+        this.socketId = this.$socket.id
+    },
+    serverMessage (arg) {
+        this.messages.push(arg)
+    },
+    serverMessages (arg) {
+        this.messages = arg
+    }
+}
 }
 </script>
+
 
 <style>
 #app {

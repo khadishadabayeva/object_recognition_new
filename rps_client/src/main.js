@@ -4,7 +4,11 @@ import router from '@/router'
 import VueSocketIO from 'vue-socket.io'
 import SocketIO from 'socket.io-client'
 
-const url = `${window.location.protocol}//${window.location.hostname}:8081`
+let url = `${window.location.protocol}//${window.location.hostname}:8081`
+
+if (process.env.VUE_APP_API_URL) {
+  url = process.env.VUE_APP_API_URL
+}
 
 const io = SocketIO(url, {})
 
@@ -22,5 +26,7 @@ new Vue({
   router,
   render: h => h(App),
 }).$mount('#app')
+
+
 
 
