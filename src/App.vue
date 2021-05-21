@@ -37,23 +37,23 @@ export default {
       predictions: [],
       audioTrackConstraints: {},
       audioDevices: [],
-      audioDevice: ''
-      // messages: [],
-      // socketId: ''
+      audioDevice: '',
+      messages: [],
+      socketId: ''
     }
   },
   
-//   sockets: {
-//     connect() {
-//         this.socketId = this.$socket.id
-//     },
-//     serverMessage (arg) {
-//         this.messages.push(arg)
-//     },
-//     serverMessages (arg) {
-//         this.messages = arg
-//     }
-// },
+  sockets: {
+    connect() {
+        this.socketId = this.$socket.id
+    },
+    serverMessage (arg) {
+        this.messages.push(arg)
+    },
+    serverMessages (arg) {
+        this.messages = arg
+    }
+},
 
   watch: {
     audioDevice: function (deviceId) {
