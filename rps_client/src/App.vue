@@ -9,10 +9,15 @@ export default {
   name: 'App',
   data () {
       return {
-          messages: [],
+          //messages: [],
           socketId: ''
       }
   },
+  computed: {
+    messages() {
+        return this.$store.state.messages
+    }
+},
   components: {
   },
   sockets: {
