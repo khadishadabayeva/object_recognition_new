@@ -15,6 +15,10 @@ const io = SocketIO(url, {})
 // add a reference to the SocketIO instance to the store
 store.$socket = io
 
+if (store.state.user != null) {
+  store.dispatch('login', store.state.user.username)
+  }
+
 const vueSocket = new VueSocketIO({
   debug: false,
   connection: io,

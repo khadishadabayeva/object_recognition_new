@@ -1,33 +1,131 @@
 import Vue from 'vue'
 import Vuex from 'vuex'
+import router from '@/router'
+import createPersistedState from "vuex-persistedstate"
+
+import {
+    LOGIN_PLAYER,
+    LOGOUT_PLAYER,
+    PLAYER_EXISTS,
+    UPDATE_PLAYERS,
+    START_MATCH,
+    MAKE_TURN,
+    END_MATCH,
+    NEW_MATCH,
+    MATCH_REQUESTED,
+    SET_MODE
+} from './mutation-types'
 
 Vue.use(Vuex)
 
 const store = new Vuex.Store({
+    plugins: [createPersistedState()],
     state: {
-        messages: []
+        user: null,
+        users: [],
+        screen: 'login',
+        invalidUser: false,
+        inMatchWith: null,
+        winner: null,
+        matchRequest: null,
+        turn: null,
+        mode: 'speech'
     },
     mutations: {
-        SEND_MESSAGE(state, payload) {
-            state.messages.push(payload)
+        [LOGIN_PLAYER](state, payload) {
+            state.user = payload
+            state.screen = 'idle'
+            state.invalidUser = false
+            state.inMatchWith = null
+            state.matchRequest = null
+            state.turn = null
         },
-        SEND_MESSAGES(state, payload) {
-            state.messages = payload
+        [LOGOUT_PLAYER](state) {
+            state.user = null
+        },
+        [PLAYER_EXISTS](state) {
+            state.invalidUser = true
+        },
+        [UPDATE_PLAYERS](state, users) {
+            state.users = users
+        },
+        [START_MATCH](state, player) {
+            state.inMatchWith = player
+            state.matchRequest = null
+            state.screen = 'match'
+        },
+        [MAKE_TURN](state, payload) {
+            state.turn = payload.turn
+        },
+        [END_MATCH](state, payload) {
+            state.winner = payload.winner
+            state.screen = 'result'
+        },
+        [NEW_MATCH](state) {
+            state.winner = null
+            state.turn = null
+            state.screen = 'idle'
+        },
+        [MATCH_REQUESTED](state, payload) {
+            state.matchRequest = payload
+        },
+        [SET_MODE](state, payload) {
+            state.mode = payload
         }
     },
     actions: {
-        sendMessage(context, payload) {
-            context.commit('SEND_MESSAGE', payload)
-            this.$socket.emit('message', {
-                screen: payload.screen
+        login(_, username) {
+            this.socket.emit('login', username)
+        },
+        logout({state}) {
+            this.socket.emit('logout', state.user.username)
+        },
+        requestMatch({ commit }, opponent) {
+            commit(MATCH_REQUESTED, opponent)
+            this.socket.emit('requestMatch', {
+                opponent
             })
         },
-        socket_serverMessage (context, payload) {
-            context.commit('SEND_MESSAGE', payload)
+        makeTurn({ commit }, turn) {
+            commit(MAKE_TURN, turn)
+            this.socket.emit('makeTurn', {
+                turn
+            })
         },
-        socket_serverMessages (context, payload) {
-            context.commit('SEND_MESSAGES', payload)
+        newMatch({ commit }) {
+            commit(NEW_MATCH)
+            this.socket.emit('newMatch')
+        },
+        setMode({commit}, mode) {
+            commit(SET_MODE, mode)
+        },
+        socket_userLoggedIn({ commit }, user) {
+            commit(LOGIN_PLAYER, user)
+            router.push({
+                name: 'game'
+            }).catch(() => {})
+        },
+        socket_userExists({ commit }) {
+            commit(PLAYER_EXISTS)
+        },
+        socket_userLoggedOut({ commit }, user) {
+            commit(LOGOUT_PLAYER, user)
+            router.push({
+                name: 'login'
+            }).catch(() => {})
+        },
+        socket_players({ commit }, players) {
+            commit(UPDATE_PLAYERS, players)
+        },
+        socket_startMatch({ commit }, opponent) {
+            commit(START_MATCH, opponent)
+        },
+        socket_matchResult({ commit }, winner) {
+            commit(END_MATCH, winner)
         }
+    },
+    getters: {
+        loggedIn: state => state.user !== null
     }
 })
 

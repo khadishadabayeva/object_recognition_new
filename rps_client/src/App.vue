@@ -21,9 +21,9 @@ export default {
   components: {
   },
   sockets: {
-      connect() {
-        this.socketId = this.$socket.id
-      },
+      // connect() {
+      //   this.socketId = this.$socket.id
+      // },
       serverMessage (arg) {
           this.messages.push(arg)
       },
